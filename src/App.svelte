@@ -8,15 +8,15 @@
   let data = rawData.map((d) => ({ ...d })).sort((a, b) => b.new - a.new);
 
   const margin = { top: 55, right: 0, bottom: -200, left: 0 };
-  $: marginBottom = isMobile ? 0 : -20;
+  $: margin.bottom = isMobile ? 0 : -200;
 
   let width = 1000;
   $: height = width < 600 ? width * 1.5 : width * 0.75 ;
   $: innerWidth = width - margin.left - margin.right;
   $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
-  $: radiusX = width < 600 ? innerWidth : innerWidth / 2;
+  $: radiusX = width < 600 ? innerWidth / 1.35 : innerWidth / 2;
   $: radiusY = innerHeight / 2;
-  $: baseInnerRadius = width < 600 ? 65 : 125;
+  $: baseInnerRadius = width < 600 ? 60 : 125;
 
 
   $: angleScale = scaleBand()
