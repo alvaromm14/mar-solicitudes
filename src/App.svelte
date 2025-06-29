@@ -9,6 +9,7 @@
 
   const margin = { top: 55, right: 0, bottom: -200, left: 0 };
   $: margin.bottom = isMobile ? 0 : -200;
+  $: margin.top = isMobile ? 15 : 55;
 
   let width = 1000;
   $: height = width < 600 ? width * 1.5 : width * 0.75 ;
