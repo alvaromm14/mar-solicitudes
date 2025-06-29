@@ -138,7 +138,6 @@
       : (d.angle * 180) / Math.PI - 90}, ${d.labelX}, ${d.labelY})`}
     pointer-events="none"
     opacity={!hovered || hovered.country === d.country ? 1 : 0}
-    style="transition: opacity 0.3s ease, font-size 0.3s ease;"
   >
     {d.country}
   </text>
@@ -156,7 +155,7 @@
     overflow: visible;
   }
   .chart-container {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
   }
   .chart-container {
