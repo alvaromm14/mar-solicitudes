@@ -1,0 +1,1 @@
+Gráfico circular con las solicitudes de ampliación de la plataforma continental.
