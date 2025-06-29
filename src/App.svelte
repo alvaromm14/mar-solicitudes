@@ -9,12 +9,13 @@
 
   const margin = { top: 55, right: 0, bottom: 0, left: 0 };
   let width = 1000;
-  $: height = width * 0.75;
+  $: height = width < 600 ? width : width * 0.75 ;
   $: innerWidth = width - margin.left - margin.right;
-  $: innerHeight = height - margin.top - margin.bottom;
+  $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
   $: radiusX = innerWidth / 2;
   $: radiusY = innerHeight / 2;
-  $: baseInnerRadius = 125;
+  $: baseInnerRadius = width < 600 ? 65 : 125;
+
 
   $: angleScale = scaleBand()
     .domain(data.map((d) => d.country))
@@ -52,6 +53,8 @@
       labelY,
     };
   });
+
+  $: isMobile = width < 600;
 
   let hovered = null;
 
@@ -106,8 +109,6 @@
 <div
   class="chart-container"
   bind:clientWidth={width}
-  bind:clientHeight={height}
-  style="position: relative; height: 100vh;"
 >
   <h2>Extensión de las ampliaciones solicitadas por cada país</h2>
   <svg {width} {height}>
@@ -141,27 +142,32 @@
           total={hovered.new}
           increase={hovered.increase}
           visible={true}
+          movil={isMobile}
         />
       {/if}
       {#each arcData as d}
-        <text
-          x={d.labelX}
-          y={d.labelY}
-          font-size={hovered?.country === d.country ? "0.75rem" : "0.65rem"}
-          font-weight={d.country === "España" && !hovered
-            ? "bold"
-            : hovered?.country === d.country
-              ? "bold"
-              : "normal"}
-          text-anchor={d.angle > Math.PI ? "end" : "start"}
-          alignment-baseline="middle"
-          transform={`rotate(${(d.angle * 180) / Math.PI - 90 > 90 ? (d.angle * 180) / Math.PI + 90 : (d.angle * 180) / Math.PI - 90}, ${d.labelX}, ${d.labelY})`}
-          pointer-events="none"
-          opacity={!hovered || hovered.country === d.country ? 1 : 0}
-          style="transition: opacity 0.3s ease, font-size 0.3s ease;"
-        >
-          {d.country}
-        </text>
+{#if !isMobile}
+  <text
+    x={d.labelX}
+    y={d.labelY}
+    font-size={hovered?.country === d.country ? "0.75rem" : "0.65rem"}
+    font-weight={d.country === "España" && !hovered
+      ? "bold"
+      : hovered?.country === d.country
+        ? "bold"
+        : "normal"}
+    text-anchor={d.angle > Math.PI ? "end" : "start"}
+    alignment-baseline="middle"
+    transform={`rotate(${(d.angle * 180) / Math.PI - 90 > 90
+      ? (d.angle * 180) / Math.PI + 90
+      : (d.angle * 180) / Math.PI - 90}, ${d.labelX}, ${d.labelY})`}
+    pointer-events="none"
+    opacity={!hovered || hovered.country === d.country ? 1 : 0}
+    style="transition: opacity 0.3s ease, font-size 0.3s ease;"
+  >
+    {d.country}
+  </text>
+{/if}
       {/each}
     </g>
   </svg>
@@ -178,11 +184,18 @@
   h2 {
     text-align: center;
   }
+h2 {
+  font-size: 1.25rem;
+  font-weight: 400;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 600px) {
   h2 {
-    font-size: 1.25rem;
-    font-weight: 400;
-    margin-bottom: 0.5rem;
+    font-size: 1rem;
+      margin-bottom: -1rem;
   }
+}
   .chart-container {
     margin: 0 auto;
   }

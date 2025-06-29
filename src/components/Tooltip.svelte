@@ -4,7 +4,16 @@
   export let total = 0;
   export let increase = 0;
   export let visible = false;
+import { onMount } from "svelte";
 
+let isMobile = false;
+
+onMount(() => {
+  const checkMobile = () => isMobile = window.innerWidth < 640;
+  checkMobile();
+  window.addEventListener("resize", checkMobile);
+  return () => window.removeEventListener("resize", checkMobile);
+});
     const colorScale = scaleLinear()
     .domain([0, 2.6])
     .range(["#d0e7f9", "#145374"])
@@ -14,7 +23,7 @@
 
   const rectHeight = 20;
   const rectPaddingX = 6;
-  const approxCharWidth = 8; // ancho aproximado por caracter en px
+  const approxCharWidth = 8;
 
   $: bgColor = colorScale(increase);
     $: percentage = Math.round(increase * 100);
@@ -22,6 +31,19 @@
 </script>
 
 {#if visible}
+  {#if isMobile}
+    <text
+      text-anchor="middle"
+      alignment-baseline="middle"
+      fill="#222"
+      font-weight="bold"
+      font-size="16"
+      y="-23"
+    >
+      {country}
+    </text>
+  {/if}
+
   <text
     text-anchor="middle"
     alignment-baseline="middle"
@@ -34,13 +56,13 @@
     </tspan>
   </text>
 
-  <g transform="translate(0, 18)">
+  <g transform={`translate(0, 18)`}>
     <rect
       x={-increaseText.length * approxCharWidth / 2 - rectPaddingX}
       y={-rectHeight / 2}
       width={increaseText.length * approxCharWidth + rectPaddingX * 2}
       height={rectHeight}
-        fill={bgColor}
+      fill={bgColor}
       rx="4"
       ry="4"
     />
@@ -51,7 +73,7 @@
       alignment-baseline="middle"
       font-weight="normal"
       font-size="14"
-        fill={textColor}
+      fill={textColor}
       pointer-events="none"
     >
       {increaseText}
