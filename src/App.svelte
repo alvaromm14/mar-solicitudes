@@ -9,7 +9,7 @@
 
   const margin = { top: 55, right: 0, bottom: 0, left: 0 };
   let width = 1000;
-  $: height = width < 600 ? width : width * 0.75 ;
+  $: height = width < 600 ? width * 1.20 : width * 0.75 ;
   $: innerWidth = width - margin.left - margin.right;
   $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
   $: radiusX = innerWidth / 2;
@@ -110,7 +110,6 @@
   class="chart-container"
   bind:clientWidth={width}
 >
-  <h2>Extensión de las ampliaciones solicitadas por cada país</h2>
   <svg {width} {height}>
     <defs>
       {#each arcData as d}
@@ -129,8 +128,8 @@
         <path
           d={d.path}
           fill={`url(#${d.gradientId})`}
-          stroke="white"
-          stroke-width="0.5"
+          stroke="black"
+          stroke-width="0.25"
           opacity={hovered ? (hovered.country === d.country ? 1 : 0.5) : 1}
           on:mouseover={() => handleMouseOver(d)}
           on:mouseout={handleMouseOut}
@@ -177,25 +176,13 @@
   :global(body) {
     background-color: #cadee7;
   }
+    svg {
+    overflow: visible;
+  }
   .chart-container {
     max-width: 900px;
     margin: 0 auto;
   }
-  h2 {
-    text-align: center;
-  }
-h2 {
-  font-size: 1.25rem;
-  font-weight: 400;
-  margin-bottom: 0.5rem;
-}
-
-@media (max-width: 600px) {
-  h2 {
-    font-size: 1rem;
-      margin-bottom: -1rem;
-  }
-}
   .chart-container {
     margin: 0 auto;
   }
