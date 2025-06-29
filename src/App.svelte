@@ -9,7 +9,7 @@
 
   const margin = { top: 55, right: 0, bottom: 0, left: 0 };
   let width = 1000;
-  $: height = width < 600 ? width * 1.20 : width * 0.75 ;
+  $: height = width < 600 ? width * 1.40 : width * 0.75 ;
   $: innerWidth = width - margin.left - margin.right;
   $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
   $: radiusX = innerWidth / 2;
@@ -66,49 +66,25 @@
     hovered = null;
   }
 
-    window.addEventListener("DOMContentLoaded", (event) => {
-    function updateIframeHeight() {
-      const el = document.documentElement;
-      const rect = el.getBoundingClientRect();
-      const styles = window.getComputedStyle(el);
-      const margin =
-        parseFloat(styles.marginTop) + parseFloat(styles.marginBottom);
-      const height = Math.ceil(rect.height + margin);
-
-      window.parent.postMessage(
-        {
-          type: "resize-iframe",
-          value: height,
-        },
-        "*",
-      );
-    }
-    updateIframeHeight();
-
-    if (window.ResizeObserver) {
-      new ResizeObserver(() => {
-        updateIframeHeight();
-      }).observe(document.documentElement);
-    } else {
-      window.addEventListener("load", updateIframeHeight);
-      window.addEventListener("resize", updateIframeHeight);
-    }
-
-    window.addEventListener(
-      "message",
-      (event) => {
-        if (event.data.type === "request-resize") {
-          updateIframeHeight();
-        }
-      },
-      false,
-    );
-  });
+	document.addEventListener("DOMContentLoaded", () => {
+		const iframe = document.getElementById("header-iframe");
+		if (!iframe) return;
+		const postResizeRequest = () => iframe.contentWindow?.postMessage({ type: "request-resize" }, "*");
+		window.addEventListener("message", ({ data }) => {
+			if (data?.type === "resize-iframe") {
+				iframe.style.height = `${data.value}px`;
+			}
+		});
+		postResizeRequest();
+		setInterval(postResizeRequest, 1500);
+	});
 </script>
 
 <div
   class="chart-container"
-  bind:clientWidth={width}
+  bind:clientWidth={width} on:click={() => {
+    hovered = null;
+  }}
 >
   <svg {width} {height}>
     <defs>
