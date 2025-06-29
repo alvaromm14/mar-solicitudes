@@ -7,12 +7,14 @@
 
   let data = rawData.map((d) => ({ ...d })).sort((a, b) => b.new - a.new);
 
-  const margin = { top: 55, right: 0, bottom: 0, left: 0 };
+  const margin = { top: 55, right: 0, bottom: -200, left: 0 };
+  $: marginBottom = isMobile ? 0 : -20;
+
   let width = 1000;
-  $: height = width < 600 ? width * 1.40 : width * 0.75 ;
+  $: height = width < 600 ? width * 1.5 : width * 0.75 ;
   $: innerWidth = width - margin.left - margin.right;
   $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
-  $: radiusX = innerWidth / 2;
+  $: radiusX = width < 600 ? innerWidth : innerWidth / 2;
   $: radiusY = innerHeight / 2;
   $: baseInnerRadius = width < 600 ? 65 : 125;
 
@@ -101,15 +103,16 @@
       transform={`translate(${margin.left + innerWidth / 2}, ${margin.top + innerHeight / 2})`}
     >
       {#each arcData as d}
-        <path
-          d={d.path}
-          fill={`url(#${d.gradientId})`}
-          stroke="black"
-          stroke-width="0.25"
-          opacity={hovered ? (hovered.country === d.country ? 1 : 0.5) : 1}
-          on:mouseover={() => handleMouseOver(d)}
-          on:mouseout={handleMouseOut}
-        />
+<path
+  d={d.path}
+  fill={`url(#${d.gradientId})`}
+  stroke="black"
+  stroke-width="0.25"
+  opacity={hovered ? (hovered.country === d.country ? 1 : 0.5) : 1}
+  on:mouseover={() => handleMouseOver(d)}
+  on:mouseout={handleMouseOut}
+  on:click|stopPropagation={() => handleClick(d)}
+/>
       {/each}
       {#if hovered}
         <Tooltip
