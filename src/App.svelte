@@ -129,7 +129,7 @@
   <text
     x={d.labelX}
     y={d.labelY}
-    font-size={hovered?.country === d.country ? "0.75rem" : "0.65rem"}
+    font-size={hovered?.country === d.country ? "1rem" : "0.85rem"}
     font-weight={d.country === "España" && !hovered
       ? "bold"
       : hovered?.country === d.country
