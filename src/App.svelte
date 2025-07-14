@@ -93,9 +93,9 @@
     <defs>
       {#each arcData as d}
         <radialGradient id={d.gradientId} cx="50%" cy="50%" r="70%">
-          <stop offset="0%" stop-color="#c7ddef" />
-          <stop offset="50%" stop-color="#7aaac7" />
-          <stop offset="100%" stop-color="#3c6e94" />
+          <stop offset="0%" stop-color="#d3e6ff" />
+          <stop offset="50%" stop-color="#a1c1f0" />
+          <stop offset="100%" stop-color="#4a8df0" />
         </radialGradient>
       {/each}
     </defs>
