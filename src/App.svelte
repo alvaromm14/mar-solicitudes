@@ -1,177 +1,372 @@
 <script>
-  import { scaleBand, scaleSqrt } from "d3-scale";
-  import { arc } from "d3-shape";
+  import world from "$data/world-110m.json";
+  import * as topojson from "topojson-client";
+  import countryToISO from "./data/countryToISO.js";
+
+  import { geoCentroid, geoOrthographic, geoPath, geoArea } from "d3-geo";
+  import { scaleLinear } from "d3-scale";
   import { max } from "d3-array";
-  import rawData from "$data/data.js";
+  import { timer } from "d3-timer";
+  import { drag } from "d3-drag";
+  import { select } from "d3-selection";
+  import { onMount } from "svelte";
+  import { spring } from "svelte/motion";
+
+  import Glow from "$components/Glow.svelte";
   import Tooltip from "./components/Tooltip.svelte";
+  import ToggleButton from "./components/ToggleButton.svelte";
+  import ClaimsCountrySelector from "$components/ClaimsCountrySelector.svelte";
+  import data from "$data/data.json";
 
-  let data = rawData.map((d) => ({ ...d })).sort((a, b) => b.new - a.new);
+  let width = 400;
+  $: height = width;
 
-  const margin = { top: 55, right: 0, bottom: -200, left: 0 };
-  $: margin.bottom = isMobile ? 0 : -200;
-  $: margin.top = isMobile ? 15 : 55;
+  $: projection = geoOrthographic()
+    .scale(width / 2)
+    .rotate([$xRotation, $yRotation])
+    .translate([width / 2, height / 2]);
 
-  let width = 1000;
-  $: height = width < 600 ? width * 1.5 : width * 0.75 ;
-  $: innerWidth = width - margin.left - margin.right;
-  $: innerHeight = width < 600 ? height - 0 - margin.bottom : height - margin.top - margin.bottom;
-  $: radiusX = width < 600 ? innerWidth / 1.35 : innerWidth / 2;
-  $: radiusY = innerHeight / 2;
-  $: baseInnerRadius = width < 600 ? 60 : 125;
+  $: path = geoPath(projection);
 
+  let xRotation = spring(0, { stiffness: 0.08, damping: 0.4 });
+  let yRotation = spring(0, { stiffness: 0.1, damping: 0.7 });
 
-  $: angleScale = scaleBand()
-    .domain(data.map((d) => d.country))
-    .range([0, 2 * Math.PI])
-    .padding(0.05);
+  let degreesPerFrame = 0.5;
 
-  $: radialScale = scaleSqrt()
-    .domain([0, max(data, (d) => d.new)])
-    .range([0, Math.min(radiusX, radiusY) - baseInnerRadius]);
+  const t = timer((elapsed) => {
+    if (dragging || tooltipData) return;
+    $xRotation += degreesPerFrame;
+  }, 0);
 
-  $: arcData = data.map((d) => {
-    const startAngle = angleScale(d.country);
-    const endAngle = startAngle + angleScale.bandwidth();
-    const angle = (startAngle + endAngle) / 2;
-    const r0 = baseInnerRadius;
-    const r1 = baseInnerRadius + radialScale(d.new);
+  const DRAG_SENSITIVITY = 1;
+  let dragging = false;
 
-    const labelRadius = r1 + 5;
-    const labelX = Math.cos(angle - Math.PI / 2) * labelRadius;
-    const labelY = Math.sin(angle - Math.PI / 2) * labelRadius;
-
-    return {
-      country: d.country,
-      new: d.new,
-      increase: d.increase,
-      path: arc()({
-        innerRadius: r0,
-        outerRadius: r1,
-        startAngle,
-        endAngle,
-      }),
-      gradientId: `grad-${d.country.replace(/\s+/g, "")}`,
-      angle,
-      labelX,
-      labelY,
-    };
+  onMount(() => {
+    const element = select(globe);
+    element.call(
+      drag()
+        .on("drag", (event) => {
+          $xRotation = $xRotation + event.dx * DRAG_SENSITIVITY;
+          $yRotation = $yRotation - event.dy * DRAG_SENSITIVITY;
+          dragging = true;
+        })
+        .on("end", () => {
+          dragging = false;
+        }),
+    );
   });
 
-  $: isMobile = width < 600;
+  let countries = topojson.feature(world, world.objects.countries).features;
+  let borders = topojson.mesh(
+    world,
+    world.objects.countries,
+    (a, b) => a !== b,
+  );
 
-  let hovered = null;
+  const colorScale = scaleLinear()
+    .domain([0, max(data, (d) => d.population)])
+    .range(["#26362E", "#0DCC6C"]);
 
-  function handleMouseOver(d) {
-    hovered = d;
+  let globe;
+
+  let zeeFeatures = [];
+  let claimsFeatures = [];
+
+  function smallClaims(features) {
+    return features.filter((f) => f.geometry && geoArea(f) < 1.0);
   }
 
-  function handleMouseOut() {
-    hovered = null;
+  onMount(async () => {
+    const zeeTopo = await (await fetch("/data/zee.json")).json();
+
+    const zeeGeo = topojson.feature(zeeTopo, zeeTopo.objects.zee);
+
+    let features = [];
+
+    if (zeeGeo.type === "FeatureCollection") {
+      features = zeeGeo.features;
+    } else if (zeeGeo.type === "GeometryCollection") {
+      features = zeeGeo.geometries.map((geom) => ({
+        type: "Feature",
+        geometry: geom,
+        properties: {},
+      }));
+    } else if (zeeGeo.type === "Feature") {
+      features = [zeeGeo];
+    }
+
+    features.forEach((f) => {
+      if (f.properties?.MRGID === 8444) {
+        reverseRings(f.geometry);
+      }
+    });
+
+    zeeFeatures = features.filter((f) => f.properties?.MRGID !== 8444);
+
+    const claims = await (await fetch("/data/claims1.geojson")).json();
+    claimsFeatures = smallClaims(claims.features);
+  });
+
+  function reverseRings(geom) {
+    const rev = (ring) => ring.slice().reverse();
+    if (geom.type === "Polygon") {
+      geom.coordinates = geom.coordinates.map(rev);
+    } else if (geom.type === "MultiPolygon") {
+      geom.coordinates = geom.coordinates.map((poly) => poly.map(rev));
+    }
   }
 
-	document.addEventListener("DOMContentLoaded", () => {
-		const iframe = document.getElementById("header-iframe");
-		if (!iframe) return;
-		const postResizeRequest = () => iframe.contentWindow?.postMessage({ type: "request-resize" }, "*");
-		window.addEventListener("message", ({ data }) => {
-			if (data?.type === "resize-iframe") {
-				iframe.style.height = `${data.value}px`;
-			}
-		});
-		postResizeRequest();
-		setInterval(postResizeRequest, 1500);
-	});
+  let tooltipData;
+
+  $: if (tooltipData) {
+    const center = geoCentroid(tooltipData);
+    $xRotation = -center[0];
+    $yRotation = -center[1];
+  }
+
+  function handleToggle(active) {
+    highlightECS = active;
+  }
+  let highlightECS = false;
+
+  let tooltipX = 0;
+  let tooltipY = 0;
+
+  function handleClaimClick(cl, event) {
+    tooltipData = cl;
+    tooltipX = event.clientX;
+    tooltipY = event.clientY;
+  }
+
+  let selectedClaimCountry = "";
+  let selectedISOCode = "";
+
+  function handleCountrySelect(country) {
+    selectedClaimCountry = country;
+
+    // Busca el país en 'countries' por nombre, ignorando mayúsculas y espacios
+    const countryData = countries.find(
+      (c) =>
+        c.country &&
+        c.country.trim().toLowerCase() === country.trim().toLowerCase(),
+    );
+
+    if (countryData) {
+      const center = geoCentroid(countryData);
+
+      // Asignar a springs para animación suave
+      $xRotation = -center[0];
+      $yRotation = -center[1];
+    }
+  }
+
+  $: filteredClaims = selectedClaimCountry
+    ? claimsFeatures.filter((cl) => {
+        for (let i = 1; i <= 8; i++) {
+          const key = `SOVEREIGN${i}`;
+          if (cl.properties?.[key] === selectedClaimCountry) return true;
+        }
+        return false;
+      })
+    : claimsFeatures;
+
+  let highlightApprovedProposals = false;
+
+  function handleToggleApprovedProposals(active) {
+    highlightApprovedProposals = active;
+  }
+
+  window.addEventListener("DOMContentLoaded", (event) => {
+    function updateIframeHeight() {
+      const el = document.documentElement;
+      const rect = el.getBoundingClientRect();
+      const styles = window.getComputedStyle(el);
+      const margin =
+        parseFloat(styles.marginTop) + parseFloat(styles.marginBottom);
+      const height = Math.ceil(rect.height + margin);
+
+      window.parent.postMessage(
+        {
+          type: "resize-iframe",
+          value: height,
+        },
+        "*",
+      );
+    }
+    updateIframeHeight();
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => {
+        updateIframeHeight();
+      }).observe(document.documentElement);
+    } else {
+      window.addEventListener("load", updateIframeHeight);
+      window.addEventListener("resize", updateIframeHeight);
+    }
+
+    window.addEventListener(
+      "message",
+      (event) => {
+        if (event.data.type === "request-resize") {
+          updateIframeHeight();
+        }
+      },
+      false,
+    );
+  });
 </script>
 
-<div
-  class="chart-container"
-  bind:clientWidth={width} on:click={() => {
-    hovered = null;
-  }}
->
-  <svg {width} {height}>
-    <defs>
-      {#each arcData as d}
-        <radialGradient id={d.gradientId} cx="50%" cy="50%" r="70%">
-          <stop offset="0%" stop-color="#d3e6ff" />
-          <stop offset="50%" stop-color="#a1c1f0" />
-          <stop offset="100%" stop-color="#4a8df0" />
-        </radialGradient>
-      {/each}
-    </defs>
+<div class="chart-container" bind:clientWidth={width}>
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-color zee-color"></span>
+      ZEE
+    </div>
+    <div class="legend-item">
+      <span class="legend-color claims-color"></span>
+      Reclamaciones
+    </div>
+    <ToggleButton
+      active={highlightApprovedProposals}
+      onToggle={handleToggleApprovedProposals}
+      label="Ver aprobadas"
+      activeColor="#2e6ecf"
+    />
+    <ToggleButton active={highlightECS} onToggle={handleToggle} />
+  </div>
 
-    <g
-      transform={`translate(${margin.left + innerWidth / 2}, ${margin.top + innerHeight / 2})`}
-    >
-      {#each arcData as d}
-<path
-  d={d.path}
-  fill={`url(#${d.gradientId})`}
-  stroke="black"
-  stroke-width="0.25"
-  opacity={hovered ? (hovered.country === d.country ? 1 : 0.5) : 1}
-  on:mouseover={() => handleMouseOver(d)}
-  on:mouseout={handleMouseOut}
-  on:click|stopPropagation={() => handleClick(d)}
-/>
-      {/each}
-      {#if hovered}
-        <Tooltip
-          country={hovered.country}
-          total={hovered.new}
-          increase={hovered.increase}
-          visible={true}
-          movil={isMobile}
+  <ClaimsCountrySelector
+    claims={claimsFeatures}
+    selectedCountry={selectedClaimCountry}
+    onSelect={handleCountrySelect}
+  />
+  <svg {width} {height} bind:this={globe} class:dragging>
+    <Glow />
+
+    <circle
+      cx={width / 2}
+      cy={height / 2}
+      r={width / 2}
+      fill="#cadee7"
+      filter="url(#glow)"
+      on:click={() => (tooltipData = null)}
+    />
+
+    {#each claimsFeatures as cl, i (i)}
+      <path
+        class="claims"
+        d={path(cl)}
+        fill={selectedClaimCountry &&
+        [...Array(8).keys()].some(
+          (i) => cl.properties?.[`SOVEREIGN${i + 1}`] === selectedClaimCountry,
+        )
+          ? "#0060f0"
+          : highlightApprovedProposals &&
+              (cl.properties?.POL_TYPE ===
+                "Propuesta aprobada total o parcialmente" ||
+                cl.properties?.POL_TYPE ===
+                  "Propuesta conjunta aprobada total o parcialmente")
+            ? "#2e6ecf"
+            : "#76a7f0"}
+        stroke="white"
+        stroke-width="0.2"
+        on:click={(event) => handleClaimClick(cl, event)}
+      />
+    {/each}
+    {#if highlightECS}
+      {#each claimsFeatures.filter((cl) => cl.properties?.POL_TYPE === "Propuesta solapada") as cl}
+        <path
+          d={path(cl)}
+          fill="none"
+          stroke="#ff4500"
+          stroke-width="1"
+          pointer-events="none"
         />
-      {/if}
-      {#each arcData as d}
-{#if !isMobile}
-  <text
-    x={d.labelX}
-    y={d.labelY}
-    font-size={hovered?.country === d.country ? "1rem" : "0.85rem"}
-    font-weight={d.country === "España" && !hovered
-      ? "bold"
-      : hovered?.country === d.country
-        ? "bold"
-        : "normal"}
-    text-anchor={d.angle > Math.PI ? "end" : "start"}
-    alignment-baseline="middle"
-    transform={`rotate(${(d.angle * 180) / Math.PI - 90 > 90
-      ? (d.angle * 180) / Math.PI + 90
-      : (d.angle * 180) / Math.PI - 90}, ${d.labelX}, ${d.labelY})`}
-    pointer-events="none"
-    opacity={!hovered || hovered.country === d.country ? 1 : 0}
-  >
-    {d.country}
-  </text>
-{/if}
       {/each}
-    </g>
+    {/if}
+
+    {#each zeeFeatures as zee}
+      <path d={path(zee)} fill="#ebf3ff" stroke="none" />
+    {/each}
+
+    {#each countries as c}
+      <path
+        d={path(c)}
+        fill={countryToISO[selectedClaimCountry] === String(c.id) // o c.properties.id
+          ? "#555555"
+          : "#cccccc"}
+        stroke="#cccccc"
+      />
+    {/each}
+
+    <circle
+      cx={width / 2}
+      cy={height / 2}
+      r={width / 2}
+      fill="none"
+      stroke="black"
+      stroke-width="0.4px"
+    />
+
+    {#if tooltipData}
+      {#key tooltipData.id}
+        <path
+          d={path(tooltipData)}
+          fill="none"
+          stroke="white"
+          stroke-width="2"
+        />
+      {/key}
+    {/if}
   </svg>
+
+  <Tooltip data={tooltipData} />
 </div>
 
 <style>
   :global(body) {
     background-color: #cadee7;
   }
-    svg {
+  .chart-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  svg {
     overflow: visible;
   }
-  .chart-container {
-    max-width: 1200px;
-    margin: 0 auto;
+  .dragging {
+    cursor: grabbing;
   }
-  .chart-container {
-    margin: 0 auto;
-  }
-
-  path:hover {
-    opacity: 0.8;
+  .claims {
     cursor: pointer;
   }
-
-  path {
-    transition: opacity 0.3s ease;
+  .legend {
+    display: flex;
+    flex-wrap: wrap; /* permite que los items se bajen a otra línea */
+    gap: 1rem; /* reduce un poco el gap para móviles */
+    justify-content: center;
+    user-select: none;
+    margin-bottom: 0.7rem;
+    font-size: 0.9rem;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .legend-color {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .zee-color {
+    background-color: #ebf3ff;
+  }
+  .claims-color {
+    background-color: #76a7f0;
+  }
+  .approved-proposal-color {
+    background-color: #28a745; /* verde tipo "aprobado" */
   }
 </style>

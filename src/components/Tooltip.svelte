@@ -1,82 +1,55 @@
 <script>
-  import { scaleLinear } from "d3-scale";
-  export let country = "";
-  export let total = 0;
-  export let increase = 0;
-  export let visible = false;
-import { onMount } from "svelte";
+  export let data;
 
-let isMobile = false;
+  // Extrae todos los territorios no nulos de las propiedades
+  function getTerritories(properties) {
+    const territories = [];
+    for (let i = 1; i <= 8; i++) {
+      const key = `SOVEREIGN${i}`;
+      if (properties[key]) {
+        territories.push(properties[key]);
+      }
+    }
+    return territories;
+  }
 
-onMount(() => {
-  const checkMobile = () => isMobile = window.innerWidth < 640;
-  checkMobile();
-  window.addEventListener("resize", checkMobile);
-  return () => window.removeEventListener("resize", checkMobile);
-});
-    const colorScale = scaleLinear()
-    .domain([0, 2.6])
-    .range(["#d0e7f9", "#145374"])
-    .clamp(true);
-    
-  $: increaseText = `+${Math.round(increase * 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}%`;
-
-  const rectHeight = 20;
-  const rectPaddingX = 6;
-  const approxCharWidth = 8;
-
-  $: bgColor = colorScale(increase);
-    $: percentage = Math.round(increase * 100);
-  $: textColor = percentage <= 80 ? "#000" : "#fff";
+  $: territories = data ? getTerritories(data.properties) : [];
 </script>
 
-{#if visible}
-  {#if isMobile}
-    <text
-      text-anchor="middle"
-      alignment-baseline="middle"
-      fill="#222"
-      font-weight="bold"
-      font-size="16"
-      y="-23"
-    >
-      {country}
-    </text>
-  {/if}
-
-  <text
-    text-anchor="middle"
-    alignment-baseline="middle"
-    fill="#222"
-    font-weight="bold"
-    font-size="18"
-  >
-    <tspan x="0" font-weight="normal" font-size="14">
-      {total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} km²
-    </tspan>
-  </text>
-
-  <g transform={`translate(0, 18)`}>
-    <rect
-      x={-increaseText.length * approxCharWidth / 2 - rectPaddingX}
-      y={-rectHeight / 2}
-      width={increaseText.length * approxCharWidth + rectPaddingX * 2}
-      height={rectHeight}
-      fill={bgColor}
-      rx="4"
-      ry="4"
-    />
-    <text
-      x="0"
-      y="1"
-      text-anchor="middle"
-      alignment-baseline="middle"
-      font-weight="normal"
-      font-size="14"
-      fill={textColor}
-      pointer-events="none"
-    >
-      {increaseText}
-    </text>
-  </g>
+{#if data}
+  <div class="tooltip">
+    {#if territories.length > 0}
+      <p><strong>{territories.join(", ")}</strong></p>
+    {/if}
+    <p>Tipo: {data.properties?.POL_TYPE?.toLowerCase()}</p>
+  </div>
 {/if}
+
+<style>
+  div {
+    position: absolute;
+    bottom: 30px;
+    right: 0;
+    text-align: right;
+  }
+
+  .tooltip {
+    background-color: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 0.6rem 1rem;
+    border-radius: 0.4rem;
+    max-width: 350px;
+    font-size: 0.9rem;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+  }
+
+  strong {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0.3rem 0;
+  }
+</style>

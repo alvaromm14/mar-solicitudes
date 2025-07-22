@@ -1,0 +1,12 @@
+    <defs>
+      <filter id="glow" height="130%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="10" />
+    <feOffset dx="0" dy="0" result="offsetblur" />
+    <feFlood flood-color="#61b5db" />
+    <feComposite in2="offsetblur" operator="in" />
+    <feMerge>
+      <feMergeNode />
+      <feMergeNode in="SourceGraphic" />
+    </feMerge>
+  </filter>
+    </defs>
